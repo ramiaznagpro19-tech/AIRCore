@@ -1,0 +1,89 @@
+# Compile le moteur AIRCore (GeckoView modifié) et publie le .aar dans « Releases ».
+name: Compiler AIRCore
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aircore
+  cancel-in-progress: true
+
+jobs:
+  aar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MOZCONFIG: ${{ github.workspace }}/aircore/mozconfig
+      MOZ_SOURCE_GIT_REPO: https://github.com/mozilla-firefox/firefox
+      MOZBUILD_STATE_PATH: /home/runner/.mozbuild
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Libérer de la place sur le disque
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -h /
+
+      - name: Lire la version
+        run: |
+          grep -E '^[A-Z_]+=' GECKO_VERSION >> "$GITHUB_ENV"
+
+      - name: Récupérer le code Gecko officiel
+        run: |
+          git init -q gecko
+          git -C gecko remote add origin "$MOZ_SOURCE_GIT_REPO"
+          git -C gecko fetch -q --depth 60 origin "$GECKO_REF"
+          git -C gecko checkout -q FETCH_HEAD
+          git -C gecko log -1 --format='Gecko : %H %s'
+
+      - name: Appliquer les modifications AIRCore
+        run: python3 aircore/patch.py gecko
+
+      - name: Cache des outils Mozilla
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.mozbuild
+          key: mozbuild-${{ env.GECKO_REF }}
+          restore-keys: mozbuild-
+
+      - name: Installer les outils (mach bootstrap)
+        working-directory: gecko
+        run: |
+          ./mach --no-interactive bootstrap --application-choice="GeckoView/Firefox for Android Artifact Mode"
+
+      - name: Compiler Gecko (mode rapide)
+        working-directory: gecko
+        run: ./mach build
+
+      - name: Construire le .aar
+        working-directory: gecko
+        run: ./mach gradle geckoview:assembleDebug
+
+      - name: Rassembler le .aar
+        run: |
+          mkdir -p out
+          AAR=$(find gecko/obj-aircore/gradle -path '*outputs/aar/*' -name '*.aar' | head -1)
+          echo "Trouvé : $AAR"
+          test -n "$AAR"
+          NAME="AIRCore-${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER}-gecko${GECKO_LABEL}-arm64-v8a.aar"
+          cp "$AAR" "out/$NAME"
+          echo "AAR_NAME=$NAME" >> "$GITHUB_ENV"
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.AAR_NAME }}
+          path: out/${{ env.AAR_NAME }}
+
+      - name: Publier dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER}" "out/${AAR_NAME}" --latest \
+            --title "AIRCore ${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER} (Gecko ${GECKO_LABEL})" \
+            --notes "Moteur AIRCore pour Android arm64, basé sur Gecko ${GECKO_LABEL} (${GECKO_REF::12}), sans télémétrie ni rapports de plantage."

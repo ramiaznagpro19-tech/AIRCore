@@ -1,0 +1,7 @@
+# AIRCore — GeckoView pour Android arm64.
+# Compilation rapide (« artifact build ») : le Java, le JavaScript et les réglages
+# sont recompilés depuis le code modifié ; le moteur C++ précompilé vient de Mozilla.
+ac_add_options --enable-project=mobile/android
+ac_add_options --target=aarch64-linux-android
+ac_add_options --enable-artifact-builds
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-aircore

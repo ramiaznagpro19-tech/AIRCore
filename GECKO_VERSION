@@ -1,0 +1,4 @@
+# Code Gecko officiel utilisé (dépôt https://github.com/mozilla-firefox/firefox, branche release)
+GECKO_REF=b59ea98ffcd5707003e24c773f7a81eaca13a625
+GECKO_LABEL=160.0.1
+AIRCORE_VERSION=1.0
