@@ -18,7 +18,7 @@ Le code de Gecko n'est pas copié dans ce dépôt : il pèse plusieurs Go (envir
 | Plantages | L'envoi des rapports vers Mozilla (Socorro) est supprimé du code Java | `geckoview/CrashReporter.java` |
 | Connexions de vérification | Portail captif, test de connectivité, détection MITM coupés ; Safe Browsing sans envoi de fichiers à Google | `geckoview-prefs.js` |
 | User-Agent | `… Firefox/160.0 AIRCore/1.0` (le jeton Firefox reste pour la compatibilité des sites) | `GeckoViewSettings.sys.mjs` |
-| Identifiants | Publication `app.air:aircore` ; API `app.air.core.AIRCore` | `geckoview/build.gradle`, `app/air/core/AIRCore.java` |
+| Identifiants | Fichier `AIRCore-….aar` ; API `app.air.core.AIRCore` (les coordonnées Maven internes restent `org.mozilla.geckoview`, dont dépend le projet Gradle de Gecko) | `app/air/core/AIRCore.java` |
 
 Pocket, Sync et les comptes Firefox ne font pas partie de GeckoView (ils sont dans l'appli Firefox, pas dans le moteur) : il n'y a rien à retirer.
 

@@ -84,10 +84,9 @@ dst.write_text((HERE / "java/app/air/core/AIRCore.java").read_text(encoding="utf
                .replace("@AIRCORE_VERSION@", VERSION), encoding="utf-8")
 done.append(str(dst.relative_to(ROOT)))
 
-# 5. Identifiants de publication : app.air:aircore au lieu de org.mozilla.geckoview:geckoview.
-gradle = "mobile/android/geckoview/build.gradle"
-edit(gradle, "group = 'org.mozilla.geckoview'\n", "group = 'app.air'\n")
-edit(gradle, '    def id = "geckoview" + project.ext.artifactSuffix\n', '    def id = "aircore" + project.ext.artifactSuffix\n')
+# 5. Les coordonnées Maven internes (org.mozilla.geckoview) ne sont pas renommées : le projet
+#    Gradle de GeckoView en dépend pour résoudre ses propres variantes. Le fichier publié
+#    s'appelle AIRCore-….aar et l'API publique est app.air.core.AIRCore.
 
 print("AIRCore : modifications appliquées :")
 for d in dict.fromkeys(done):
