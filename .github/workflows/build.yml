@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 90
     env:
       MOZCONFIG: ${{ github.workspace }}/aircore/mozconfig
-      MOZ_SOURCE_GIT_REPO: https://github.com/mozilla-firefox/firefox
+      GECKO_GIT: https://github.com/mozilla-firefox/firefox
       MOZBUILD_STATE_PATH: /home/runner/.mozbuild
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
       - name: Récupérer le code Gecko officiel
         run: |
           git init -q gecko
-          git -C gecko remote add origin "$MOZ_SOURCE_GIT_REPO"
+          git -C gecko remote add origin "$GECKO_GIT"
           git -C gecko fetch -q --depth 60 origin "$GECKO_REF"
           git -C gecko checkout -q FETCH_HEAD
           git -C gecko log -1 --format='Gecko : %H %s'
@@ -60,30 +60,38 @@ jobs:
         working-directory: gecko
         run: ./mach build
 
-      - name: Construire le .aar
+      - name: Construire le .aar (et le dépôt Maven)
         working-directory: gecko
-        run: ./mach gradle geckoview:assembleDebug
+        run: ./mach gradle geckoview:publishDebugPublicationToMavenRepository
 
       - name: Rassembler le .aar
         run: |
           mkdir -p out
-          AAR=$(find gecko/obj-aircore/gradle -path '*outputs/aar/*' -name '*.aar' | head -1)
-          echo "Trouvé : $AAR"
-          test -n "$AAR"
+          M=gecko/obj-aircore/gradle/maven
+          AAR=$(find "$M" -name '*.aar' | head -1)
+          POM=$(find "$M" -name '*.pom' -path '*/aircore*' | head -1)
+          echo "Trouvé : $AAR / $POM"
+          test -n "$AAR" && test -n "$POM"
+          GROUP=$(sed -n 's:.*<groupId>\(.*\)</groupId>.*:\1:p' "$POM" | head -1)
+          ART=$(sed -n 's:.*<artifactId>\(.*\)</artifactId>.*:\1:p' "$POM" | head -1)
+          VER=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' "$POM" | head -1)
+          echo "$GROUP:$ART:$VER" > "$M/COORDS"
+          cat "$M/COORDS"
           NAME="AIRCore-${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER}-gecko${GECKO_LABEL}-arm64-v8a.aar"
           cp "$AAR" "out/$NAME"
+          (cd "$M" && zip -qr "$GITHUB_WORKSPACE/out/aircore-maven.zip" .)
           echo "AAR_NAME=$NAME" >> "$GITHUB_ENV"
           ls -la out
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.AAR_NAME }}
-          path: out/${{ env.AAR_NAME }}
+          path: out/
 
       - name: Publier dans Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER}" "out/${AAR_NAME}" --latest \
+          gh release create "v${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER}" "out/${AAR_NAME}" out/aircore-maven.zip --latest \
             --title "AIRCore ${AIRCORE_VERSION}.${GITHUB_RUN_NUMBER} (Gecko ${GECKO_LABEL})" \
             --notes "Moteur AIRCore pour Android arm64, basé sur Gecko ${GECKO_LABEL} (${GECKO_REF::12}), sans télémétrie ni rapports de plantage."
